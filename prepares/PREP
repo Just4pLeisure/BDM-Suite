@@ -1,0 +1,44 @@
+* Prepare a Saab Trionic ECU to run a Target-Resident Command Driver
+* ==================================================================
+* This script makes the SRAM module in MC68322 and MC68377 CPUs present
+* present in Saab Trionic 5.x, 7 and 8 ECUs available at address 0x00100000
+*
+* The script must be executed before the FLASH chips can be read (DUMP a
+* .BIN file), programmed (FLASH a .BIN file), erased (forceably erase 28Fxxx
+* FLASH chips in T5.x ECUs only) or checked (test checksum as a quick way 
+* of verifying that the .BIN file is OK).
+*
+* Created by Sophie Dexter
+* This would not have been posssibly without Patrik Servin's original work
+* Version 1.0
+* 17-Jul-2012
+*
+* Reset ECU
+reset
+* Stop execution
+stop
+*Set up for flashing
+*
+* Enable MC68332's 2kByte TPURAM and map it to address 0x00100000
+* TPURAM Base Address and Status Register (TRAMBAR) 0xFFFB04 = 0x1000
+*
+* The MC68377 CPU in Trionic 8 ECUs has a similar, 8kByte, SRAM module
+* SRAM Module Base Address HI (A31..16) (RAMBAH) 0xFFFB04 = 0x0010
+* The SRAM Configuration Register must also be set to allow its use
+* SRAM Module Configuration Register (RAMMCR) 0xFFFB00 = 0x0000
+*
+* The difference between SIMCR/MCR registers after reset can be used
+* to determine ECU/CPU type and how to configure the SRAM registers
+* SIMCR 0xFFFA00 = 0x60CF means MC68332 CPU (expected 0x00CF ???)
+*   MCR 0xFFFA00 = 0x7E4F means MC68377 CPU
+* I use bit 7 in a calculation to set the value for TRAMBAR/RAMBAH
+mm 0xfffb04
+(0x10 << ((*0xfffa00.w & 0x80) >> 4)).
+* RAMMCR = 0x0000 is only needed for MC68377 but is OK for MC68322
+mm 0xfffb00
+0x0000.
+* tell BD32 to use internal RAM 0x00100000 for target resident driver
+driver 0x00100000
+*
+cls
+* Your ECU is now prepared for DUMPing, FLASHing, ERASEing or CHECKing.

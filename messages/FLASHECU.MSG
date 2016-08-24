@@ -1,0 +1,7 @@
+FLASHECU	for programing the FLASH memory of a SAAB Trionic ECU
+1: Error: Could not write to file
+2: Error: Could not open file
+3: Error: Unrecognised ECU or FLASH chips
+4: Wrong number of parameters
+5: Unable to program FLASH chips
+6: Unable to erase FLASH chips
