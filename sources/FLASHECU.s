@@ -33,6 +33,19 @@
 * Version 1.0
 * 06-Sep-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Bugfixes:
+* Added missing test for unknown FLASH chips and exit with an error message
+*
+* Improvements:
+* Removal of odd bits of unnecessary code and other changes to reduce size
+* Use PLL lock status bit to test for a stable clock signal in T8 ECUs
+* Enable backspace to allow editing/correction of BIN file's filename
+* Turn off FLASH programming voltage when not needed
+* Added the ability to FLASH 2 copies of a T5.2 BIN file to a T5.5 ECU
+* ===========================================================================
 * ===========================================================================
 *
 * WARNING: Use at your own risk, sadly this software comes with no guarantees
@@ -40,6 +53,25 @@
 * accept liability for any damage arising from its use.
 *
 * ===========================================================================
+* ===========================================================================
+*
+		EVEN
+*
+START			dc.l	PROG_START	
+*
+Start_Msg		dc.b	'Trionic ECU FLASH script',$0D,$0A,$0
+Program_Msg		dc.b	'Programming FLASH chip addresses:',$0D,$0A,$0
+End_Msg   		dc.b	'Trionic ECU FLASH chips updated - enjoy :-)',$0D,$0A,$0
+*
+FLASH_Size_Msg	dc.b	'FLASH size: 0x'
+Bytes_Msg		dc.b	'0Cafe0 Bytes'
+CR_LF			dc.b	$0D,$0A,$0
+*
+Progress_Msg	dc.b	'0x'
+Progress_Msg1	dc.b	'0Cafe0-0Babe0',$0D,$0
+*
+FMODE			dc.b	'rb',0			* Binary read mode
+*
 * ===========================================================================
 *
 * Equates used to improve readability
@@ -51,31 +83,12 @@
 		include timers.inc				* Delay loop constants
 		include flash.inc				* FLASH chip constants
 * ---------------------------------------------------------------------------
-		EVEN
-*
-START			dc.l	PROG_START	
-*
-Start_Msg		dc.b	'Trionic ECU FLASH script',$0D,$0A,$0
-Program_Msg		dc.b	'Programming FLASH chips',$0D,$0A,$0
-End_Msg   		dc.b	'Trionic ECU FLASH chips updated - enjoy :-)',$0D,$0A,$0
-*
-FLASH_Size_Msg	dc.b	'FLASH size: 0x'
-Bytes_Msg		dc.b	'0Cafe0 Bytes',$0D,$0A,$0
-*
-Progress_Msg	dc.b	'0x'
-Progress_Msg1	dc.b	'0Cafe0-0Babe0',$0D,$0
-*
-CR_LF			dc.b	$0D,$0A,$0
-*
-FMODE			dc.b	'rb',0			* Binary read mode
-*
-* ===========================================================================
 *
 * Subroutine function modules:
 *
 		EVEN
 *
-		include printhex.s
+		include 6hex2asc.s
 		include spinner.s
 		include prepecu.s
 		include flashid.s
@@ -89,7 +102,6 @@ FMODE			dc.b	'rb',0			* Binary read mode
 *
 PROG_START:
 		lea.l	(STACK,pc),a7			* Stack pointer definition
-		move.l	a0,a6					* Pointer to the parameters
 		clr.l	(FILE,a5)				* File pointer 
 		clr.l	d7						* No errors
 *
@@ -106,6 +118,13 @@ PROG_START:
 * Work out what type and size of FLASH chip(s) are fitted
 *
 		jsr		(Get_FLASH_Id,pc).w
+* ---------------------------------------------------------------------------
+* Check that FLASH is recognised
+Check_FLASH_OK:
+		tst.w	d2						* d2 has FLASH_type, 0 means unknown
+		beq.w	Unknown_FLASH
+* ---------------------------------------------------------------------------
+Identified_FLASH:
 *
 * Display a message showing what type of ECU is connected
 *
@@ -115,8 +134,6 @@ PROG_START:
 *
 		lea.l	(Bytes_Msg,pc),a0
 		move.l	(FLASH_Size,pc),d2
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr		(hex2ascii,pc).w
 		lea.l	(FLASH_Size_Msg,pc),a0	* Show FLASH/BIN size in Hex
 		moveq	#BD_PUTS,d0				* BD32 display string function call
@@ -145,8 +162,7 @@ PROG_START:
 *	d1 - used for BD32 function calls
 *	d2 - used for BD32 function calls and
 *		 displaying progress message addresses
-*	d3 - used for BD32 function calls and
-*		 displaying progress message addresses
+*	d3 - used for BD32 function calls
 *
 *	a0 - used for BD32 function calls and
 *		 is the address of the data buffer
@@ -166,15 +182,14 @@ Program_FLASH_loop:
 		move.l	(FILE,pc),d1			* File handle
 		moveq	#BD_FREAD,d0			* BD32 File read function call
 		bgnd
+		cmpi.w	#BUFF_SIZE,d0
+		bne.b	Check_T52_to_T55
+* ---------------------------------------------------------------------------
 		lea.l	(Progress_Msg1,pc),a0
 		move.l	a1,d2					* Start address of FLASH 'chunk'
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr 	(hex2ascii,pc).w
-		adda.w	#$1,a0	
+		addq	#$1,a0	
 		addi.w	#BUFF_SIZE-1,d2			* End address of FLASH 'chunk'
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr		(hex2ascii,pc).w
 		lea.l	(Progress_Msg,pc),a0	* Show FLASH 'chunk' message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
@@ -182,9 +197,9 @@ Program_FLASH_loop:
 * ---------------------------------------------------------------------------
 		jsr		(Flash_Programming,pc).w
 		tst.b	d0
-		bne		PROG_ERR
+		bne.b	PROG_ERR
 
-		adda.l	#BUFF_SIZE,a1
+		adda.w	#BUFF_SIZE,a1
 		cmp.l	(FLASH_Size,pc),a1
 		bne		Program_FLASH_loop		* Refill RAM buffer
 *
@@ -194,13 +209,27 @@ Program_FLASH_loop:
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
 		bra.b	Close_File
+* ---------------------------------------------------------------------------
+* Special feature to program 2 T5.2 images to a T5.5 ECU
+Check_T52_to_T55:
+		clr.l	d7						* No errors
+		cmp.l	#$40000,(FLASH_Size,pc)	* Check to see if this is a T5.5 ECU
+		bne.b	File_Read_Error
+		cmp.l	#$20000,a1				* Check if we reached the end of a T5.2 BIN file
+		bne.b	File_Read_Error
+		moveq 	#0,d3					* seek in file relative to file start
+		moveq 	#0,d2					* offset 0 
+		move.l 	(FILE,pc),d1			* File handle
+		moveq	#BD_FSEEK,d0			* BD32 file seek ('rewind' to start)
+		bgnd
+		move.w	#$AAAA,d7				* preserve 29Fxxx unlock sequence
+		bra.b	Program_FLASH_loop
+* ---------------------------------------------------------------------------
 *
 ERASE_ERR:
-		addq	#1,d7					* Error 6! Unable to erase FLASH
+		addq	#1,d7					* Error 5! Unable to erase FLASH
 PROG_ERR:
-		addq	#1,d7					* Error 5! Unable to program FLASH
-PAR_ERR:
-		addq	#1,d7					* Error 4! Wrong number of parameters
+		addq	#1,d7					* Error 4! Unable to program FLASH
 Unknown_FLASH:
 		addq	#1,d7					* Error 3! Unknown FLASH chips 
 File_Open_Error:
@@ -210,7 +239,7 @@ File_Read_Error:
 *
 Close_File:
 		move.l	(FILE,pc),d1			* File handle
-		beq		Leave_Resident_Driver	* Check if file is open
+		beq.b	Leave_Resident_Driver	* Check if file is open
 		moveq	#BD_FCLOSE,d0			* Close file
 		bgnd
 Leave_Resident_Driver:
@@ -219,8 +248,8 @@ Leave_Resident_Driver:
 		bgnd
 *
 BUFFER			ds.b	BUFF_SIZE		* Data buffer
-* Reserve 10 Words for the Stack
-				dc.b	'STACK_STACK_STACK_STACK_STACK_'
+* Reserve 4 Words for the Stack
+				dc.b	'STACK_'
 STACK			ds.w	1
 *
 	END

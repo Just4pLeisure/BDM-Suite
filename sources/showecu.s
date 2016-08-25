@@ -24,6 +24,12 @@
 * Version 1.0
 * 17-Jul-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Remove check of FLASH size because script would have failed before getting
+* here.
+* ===========================================================================
 *
 		EVEN
 *
@@ -37,7 +43,6 @@ ECU_Msg			dc.b	'  ',$0D,$0A,$0
 Show_ECU_Type:
 		move.l	(FLASH_Size,pc),d0		* d0 = 0x20000/40000/80000/100000
 *										* or 0x00000000 if unknown !!!
-		beq		Unknown_FLASH			* ERROR! Unknown FLASH size ERROR
 		swap	d0						* d0 = 0x02/04/08/10
 		lea.l	(ECU_Msg,pc),a0
 		moveq	#'8',d1					* '8' - for T8 ECU

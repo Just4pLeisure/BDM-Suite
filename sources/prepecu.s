@@ -9,7 +9,7 @@
 *
 * @param		VOID		No input parameters
 *
-* @registers	d0,d1		Holds temporary values
+* @registers	d0			Holds temporary values
 *
 *				a0			Holds CPU configuration register addresses
 *
@@ -84,19 +84,16 @@ Synthesiser_Lock_Flag:
 prep_T8:
 * set MC68377 to double it's default speed (16 MHz?) (SYNCR)
 		adda.w	#$8,a0					* A0 = 0x00FFFA08
-		move.w	#$6908,(a0)				* First set the MFD part
+		move.w	#$6908,(a0)+			* First set the MFD part
 *										* (change 4x to 8x)
-* wait for everything to settle (should really check the PLL lock register)
-		moveq	#9,d0
-		move.w	#Count_10ms,d1			* 10ms delay count value
-Wait_100ms_for_T8_PLL:
-		nop								* 10x10ms delays
-		dbra	d1,Wait_100ms_for_T8_PLL
-		dbra	d0,Wait_100ms_for_T8_PLL
-		move.w	#$6808,(a0)				* Now set the RFD part
+* wait for everything to settle checking the PLL lock register (SYNST)
+T8_Synthesiser_Lock_Flag:
+		btst.b	#9,(a0)					* test PLL lock status bit
+		beq.b	T8_Synthesiser_Lock_Flag
+		move.w	#$6808,-(a0)			* Now set the RFD part
 *										* (change /2 to /1)
-		adda.w	#$48,a0					* A0 = 0x00FFFA50 (SYPCR)
-		clr.w	(a0)					* Disable watchdog and monitors
+		adda.w	#$48,a0					* A0 = 0x00FFFA50
+		clr.w	(a0)					* Disable watchdog and monitors (SYPCR)
 *
 prep_return:
 		rts

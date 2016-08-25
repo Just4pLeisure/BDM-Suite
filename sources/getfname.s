@@ -26,6 +26,11 @@
 * Version 1.0
 * 27-Jul-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Added the ability to edit the filename as it is typed 
+* ===========================================================================
 *
 		EVEN
 *
@@ -50,10 +55,17 @@ Filename_loop:
 		moveq	#BD_GETCHAR,d0			* BD32 get character function call
 		bgnd							* Get one character at a time
 		cmpi.b	#$d,d0					* test for enter (carriage return)
-		beq		Got_Filename
-		cmpi.b	#'.',d0
-		beq		Got_Filename
+		beq.b	Got_Filename
+		cmpi.b	#'.',d0					* test for '.'
+		beq.b	Got_Filename
 		move.b	d0,(a0)+				* store the character
+		cmpi.b	#$8,d0					* test for backspace
+		bne.b	Display_Character
+		subq	#2,a0					* move back 1 character in
+*										* FILE_NAME string
+		addq	#1,d4					* increase by 2 for deleted char and
+*										* backspace
+Display_Character:
 		move.b	d0,d1
 		moveq	#BD_PUTCHAR,d0			* BD32 display character function call
 		bgnd							* and display it

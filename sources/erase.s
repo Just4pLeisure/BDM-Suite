@@ -19,6 +19,7 @@
 * @return		d0			SUCCESS / FAILURE
 * @return		d6			0x5555 Part of 29Fxxx unlock sequence
 * @return		d7			0xAAAA Part of 29Fxxx unlock sequence
+*							0x0 on FAILURE (for BD32 error return number)
 *
 * @return		a5			T5.x FLASH start address (always 0x000000)
 *							0x5554 (0x2AAA*2) 29Fxxx unlock address
@@ -29,6 +30,12 @@
 * Version 1.0
 * 17-Jul-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Clear d7 register on failure for correct BD32 error return code
+* ===========================================================================
+*
 *
 		EVEN
 *
@@ -53,6 +60,7 @@ Erase_FLASH_Chips:
 *	d2 - used for FLASH size
 *	d6 - 0x5555 1st part of FLASH chip unlock sequence
 *	d7 - 0xAAAA 2nd part of FLASH chip unlock sequence
+*	d7 - used for BD32 error return number
 *
 *	a5 - used for T5.x FLASH start address (always 0x000000)
 *   a5 - 0x5554 (0x2AAA*2) 1st FLASH chip unlock address
@@ -83,6 +91,7 @@ Erase_FLASH_Chips:
 		cmpi.b	#4,d1					* Atmel 29Cxxx
 		beq.b	Erase_29C512
 * ERROR! FLASH chips not recocgnised if here
+		clr.l	d7						* Clear d7 for correct error messages
 		bra.w	Erase_Failed
 *
 * ===========================================================================
@@ -95,6 +104,7 @@ Erase_FLASH_Chips:
 *
 Erase_29C512:
 Erase_29C010:
+		clr.l	d7						* Clear d7 for correct error messages
 		bra.w	Erase_Failed			* Branch back to where Flash_Prog ends
 *
 * ===========================================================================

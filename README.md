@@ -1,7 +1,7 @@
 **Universal BD32 scripts for Trionic5.x, 7 and 8 ECUs**
 ====
 
-The **Universal BD32 scripts for Trionic5.x, 7 and 8 ECUs** are a collection of BDM resident drivers (aka scripts) for reading (DUMPECU) and updating (FLASHECU) Trionic ECUs found in Saab cars.
+The **Universal BD32 scripts for Trionic5.x, 7 and 8 ECUs** are a collection of BDM resident drivers (aka scripts) for reading (DUMPECU), updating (FLASHECU) and verifying the **FB** checksum of (CHECKECU) Trionic ECUs found in Saab cars.
 
 --------
 

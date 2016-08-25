@@ -1,7 +1,6 @@
 FLASHECU	for programing the FLASH memory of a SAAB Trionic ECU
-1: Error: Could not write to file
-2: Error: Could not open file
+1: Error: Could not read from BIN file
+2: Error: Could not open BIN file
 3: Error: Unrecognised ECU or FLASH chips
-4: Wrong number of parameters
-5: Unable to program FLASH chips
-6: Unable to erase FLASH chips
+4: Unable to program FLASH chips
+5: Unable to erase FLASH chips

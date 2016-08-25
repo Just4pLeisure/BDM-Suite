@@ -1,0 +1,5 @@
+CHECKECU	for CHECKing the FLASH memory of a SAAB Trionic ECU
+1: Error: Checksum is incorrect - Update ECU with FLASHECU
+2: Error: Could not read HEADER information - Update ECU with FLASHECU 
+3: Error: Unrecognised ECU or FLASH chips
+

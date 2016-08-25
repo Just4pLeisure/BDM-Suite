@@ -1,21 +1,17 @@
 * =============== S U B	R O U T	I N E =======================================
 * ===========================================================================
-* =============== Get_FLASH_Id_Bytes ========================================
+* =============== Get_FLASH_Id ==============================================
 * ===========================================================================
 *
-* FLASH ID is obtained by putting the chip in a special mode
-* This is done differently for 28Fxxx and 29F/Cxxx types od FLASH chip
-* I have assumed that if the check for 28Fxxx types doesn't work then I can
-* detect this because 29F/Cxxx types will just return the 'normal'
-* contents of the FLASH chip at these locations.
-* Normally FF FF  F7 FC - because that's how all T5 BIN files start
+* FLASH ID is obtained by putting the chip in a special mode where the
+* manufacturer and device IDs can be read from the start and first addresses.
+* 28Fxxx type FLASH chips require a programming voltage to be present for
+* device identification. It is unlikely that a FLASH chip will be mis-
+* identified because the 'normal' contents at these locations do no match any
+* known FLASH chip type:
+* Normally FF FF  F7 FC - how all T5 BIN files start
 * Could be FF FF  FF FF - if the FLASH has been erased
 * Could be 00 00  00 00 - if the FLASH has had all zeroes written to it
-*
-* None of the above byte values are the same as any of the expected id bytes
-* So just check for Manufacturer codes $89 (Intel) and $01 (AMD) after the
-* original FLASH id program, and if neither are found then go on to try
-* to detect 29F/Cxxx type FLASH chips.
 *
 * ===========================================================================
 *
@@ -43,13 +39,23 @@
 * Version 1.0
 * 17-Jul-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* A few changes to reduce code size
+*
+* As ever I have used a few tricks to get the code small. e.g. moveq and swap
+* instructions to load a large number into a register. The rol instruction
+* is used to multiply a number by a power of 2 (x2, x4, x8 etc)
+*
+* lea.l	$0,a2 uses less bytes than movea.l	#0,a2 to set a2 to 0x0000
+* ===========================================================================
 *
 		EVEN
 *
-FLASH_Make:		dc.b	0
-FLASH_Type:		dc.b	0	* 0=?, 1=28F, 2=29F 8bit, 3=29F 16bit, 4=29C
-FLASH_Id:		dc.l	0
-FLASH_Size:		dc.l	0
+FLASH_Id:	dc.l	0
+FLASH_Size:	dc.l	0
+FLASH_Type:	dc.b	0	* 0=?, 1=28F, 2=29F 8bit, 3=29F 16bit, 4=29C
 *
 * ===========================================================================
 *
@@ -57,7 +63,7 @@ FLASH_Size:		dc.l	0
 *
 Get_FLASH_Id:
 * Read FLASH chip manufacturer and device Ids
-		movea.l	#0,a2					* Base address of FLASH
+		lea.l	$0,a2					* Base address of FLASH
 		move.w	#$AAAA,$5555*2			*
 		move.w	#$5555,$2AAA*2			*
 		move.w	#$9090,$5555*2			*
@@ -70,7 +76,8 @@ Get_FLASH_Id:
 * Prepare to work out size of FLASH chip(s)
 		move.l	(FLASH_Id,pc),d0
 * Check for FLASH chips that might be in a T5.2 ECU
-		move.l	#$020000,d1				* T5.2 is 128kBytes (0x20000)
+		moveq	#2,d1					* T5.2 is 128kBytes (0x20000)
+		swap	d1						* swap: 0x2 becomes 0x20000
 		moveq	#1,d2
 		cmpi.b	#AMD28F512,d0			* AMD 28F512
 		beq.b	FLASH_id_ret
@@ -117,5 +124,5 @@ FLASH_id_ret:
 		rts
 *
 * ===========================================================================
-* =============== End of Get_FLASH_Id_Bytes =================================
+* =============== End of Get_FLASH_Id =======================================
 * ===========================================================================

@@ -1,5 +1,4 @@
 DUMPECU	for reading the FLASH memory of a SAAB Trionic ECU
-1: Error: Could not write to file
-2: Error: Could not open file
+1: Error: Could not write to BIN file
+2: Error: Could not open BIN file
 3: Error: Unrecognised ECU or FLASH chips
-4: Wrong number of parameters

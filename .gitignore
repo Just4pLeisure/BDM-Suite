@@ -1,20 +1,19 @@
 # Executables
-*.exe 
-*.EXE 
+*.exe
+*.EXE
 # Symbol files
-*.sym 
-*.SYM 
+*.sym
+*.SYM
 # Listing files
 *.lst
-*.LST 
+*.LST
 # S-Record files
 *.s19
-*.S19 
+*.S19
 # Zip files
 *.zip
 *.ZIP
-# All automatically generated files in the listings folder 
+# All automatically generated files in the listings folder
 listings/
-# All files in /release folder
+# All files in release folder
 release/
-#

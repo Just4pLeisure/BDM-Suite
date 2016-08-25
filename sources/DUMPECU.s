@@ -33,12 +33,44 @@
 * Version 1.0
 * 06-Sep-2012
 * ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Bugfixes:
+* Added missing test for unknown FLASH chips and exit with an error message
+*
+* Improvements:
+* Removal of odd bits of unnecessary code and other changes to reduce size
+* Use PLL lock status bit to test for a stable clock signal in T8 ECUs
+* Enable backspace to allow editing/correction of BIN file's filename
+* Turn off FLASH programming voltage when not needed
+* ===========================================================================
+* ===========================================================================
 *
 * WARNING: Use at your own risk, sadly this software comes with no guarantees
 * This software is provided 'free' and in good faith, but the author does not
 * accept liability for any damage arising from its use.
 *
 * ===========================================================================
+* ===========================================================================
+*
+		EVEN
+*
+START			dc.l	PROG_START	
+*
+Start_Msg		dc.b	'Trionic ECU DUMP script',$0D,$0A,$0
+Dump_Msg 		dc.b	'DUMPing FLASH chip addresses:',$0D,$0A,$0
+End_Msg   		dc.b	'Trionic ECU DUMPed to: ',$0
+*
+FLASH_Size_Msg	dc.b	'FLASH size: 0x'
+Bytes_Msg		dc.b	'0Cafe0 Bytes'
+CR_LF			dc.b	$0D,$0A,$0
+*
+Progress_Msg	dc.b	'0x'
+Progress_Msg1	dc.b	'0Cafe0-0Babe0',$0D,$0
+*
+FMODE			dc.b	'wb',0			* Write privileges for file
+*
 * ===========================================================================
 *
 * Equates used to improve readability
@@ -51,26 +83,6 @@
 		include flash.inc				* FLASH chip constants
 * ---------------------------------------------------------------------------
 *
-		EVEN
-*
-START			dc.l	PROG_START	
-*
-Start_Msg		dc.b	'Trionic ECU DUMP script',$0D,$0A,$0
-Dump_Msg 		dc.b	'DUMPing FLASH chips addresses',$0D,$0A,$0
-End_Msg   		dc.b	'Trionic ECU DUMPed to: ',$0
-*
-FLASH_Size_Msg	dc.b	'FLASH size: 0x'
-Bytes_Msg		dc.b	'0Cafe0 Bytes',$0D,$0A,$0
-*
-Progress_Msg	dc.b	'0x'
-Progress_Msg1	dc.b	'0Cafe0-0Babe0',$0D,$0
-*
-CR_LF			dc.b	$0D,$0A,$0
-*
-FMODE			dc.b	'wb',0			* Write privileges for file
-*
-* ===========================================================================
-*
 * Subroutine function modules:
 *
 		EVEN
@@ -79,14 +91,13 @@ FMODE			dc.b	'wb',0			* Write privileges for file
 		include flashid.s
 		include showecu.s
 		include getfname.s
-		include printhex.s
+		include 6hex2asc.s
 * ---------------------------------------------------------------------------
 *
 		EVEN
 *
 PROG_START:
 		lea.l	(STACK,pc),a7			* Stack pointer definition
-		move.l	a0,a6					* Pointer to the parameters
 		clr.l	(FILE,a5)				* File pointer 
 		clr.l	d7						* No errors
 *
@@ -103,6 +114,19 @@ PROG_START:
 * Work out what type and size of FLASH chip(s) are fitted
 *
 		jsr		(Get_FLASH_Id,pc).w
+* Read MC68332/377 Module Control Register (SIMCR/MCR)
+* and use the value to work out if ECU is a T5/7
+		movea.l	#$FFFA00,a0
+		btst.b	#4,(a0)
+		bne.b	Check_FLASH_OK
+* Turn FLASH programming voltage off if T5/7
+		andi.w	#$FFBF,($FFFC14).l
+* ---------------------------------------------------------------------------
+* Check that FLASH is recognised
+Check_FLASH_OK:
+		tst.w	d2						* d2 has FLASH_type, 0 means unknown
+		beq.w	Unknown_FLASH
+* ---------------------------------------------------------------------------
 Identified_FLASH:
 *
 * Display a message showing what type of ECU is connected
@@ -113,8 +137,6 @@ Identified_FLASH:
 *
 		lea.l	(Bytes_Msg,pc),a0
 		move.l	(FLASH_Size,pc),d2
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr		(hex2ascii,pc).w
 		lea.l	(FLASH_Size_Msg,pc),a0	* Show FLASH/BIN size in Hex
 		moveq	#BD_PUTS,d0				* BD32 display string function call
@@ -135,13 +157,9 @@ Identified_FLASH:
 READ_WRITE:
 		lea.l	(Progress_Msg1,pc),a0
 		move.l	a1,d2					* start address of FLASH 'chunk'
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr 	(hex2ascii,pc).w
-		adda.w	#$1,a0	
+		addq	#$1,a0	
 		addi.w	#BUFF_SIZE-1,d2			* end address of FLASH 'chunk'
-		rol.l	#8,d2
-		moveq.l	#5,d3
 		jsr 	(hex2ascii,pc).w
 		lea.l	(Progress_Msg,pc),a0	* Show FLASH 'chunk' message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
@@ -162,7 +180,6 @@ READ_WRITE:
 		lea.l	(End_Msg,pc),a0			* Show successful DUMP message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
-		move.l	(4,a6),a0				* Pointer to file name
 		lea.l 	(FILE_NAME,a5),a0		* Get BIN file's filename
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
@@ -171,8 +188,6 @@ READ_WRITE:
 		bgnd
 		bra.b	Close_File
 *
-PAR_ERR:
-		addq	#1,d7					* Error 4! Wrong number of parameters
 Unknown_FLASH:
 		addq	#1,d7					* Error 3! Unknown FLASH chips 
 File_Open_Error:
@@ -181,7 +196,7 @@ File_Write_Error:
 		addq	#1,d7					* Error 1! Could not write to file
 Close_File:
 		move.l	(FILE,a5),d1			* File handle
-		beq		Leave_Resident_Driver	* Check if file is open
+		beq.b	Leave_Resident_Driver	* Check if file is open
 		moveq	#BD_FCLOSE,d0			* Close file
 		bgnd
 Leave_Resident_Driver:
@@ -189,8 +204,7 @@ Leave_Resident_Driver:
 		moveq	#BD_QUIT,d0				* Finished
 		bgnd
 *
-				ds.w	10				* Reserve 10 Words for the Stack
-STACK			ds.w	1
-END_OF_CODE		dc.b	'END END END'
+				dc.b	'STACK_STACK_STACK_STACK_STACK_'
+STACK			ds.w	1				* Reserve 16 Words for the Stack
 *
 	END

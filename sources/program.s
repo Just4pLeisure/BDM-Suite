@@ -29,6 +29,7 @@
 * @return		d0			SUCCESS / FAILURE
 * @return		d6			0x5555 Part of 29Fxxx unlock sequence
 * @return		d7			0xAAAA Part of 29Fxxx unlock sequence
+*							0x0 on FAILURE (for BD32 error return number)
 *
 * @param		a1			is the first FLASH address programmed
 * @return		a5			T5.x FLASH start address (always 0x000000)
@@ -39,6 +40,13 @@
 * Created by Sophie Dexter
 * Version 1.0
 * 17-Jul-2012
+* ===========================================================================
+* Version 1.1
+* 26-May-2013
+*
+* Clear d7 register on failure for correct BD32 error return code
+*
+* Removed a left over debug message
 * ===========================================================================
 *
 		EVEN
@@ -78,20 +86,9 @@ Flash_Programming:
 		move.b	(FLASH_Type,pc),d1
 		cmpi.b	#3,d1					* AMD 29F400T/BL802C 
 		beq.w	Flash_29F400
-* ---------------------------------------------------------------------------
-* debug display '4' in BD32 to indicate unrecognised FLASH
-		moveq	#'4',d1					* 4
-		moveq	#BD_PUTCHAR,d0
-		bgnd
-		moveq	#$0d,d1					* Carriage return
-		moveq	#BD_PUTCHAR,d0
-		bgnd
-		moveq	#$0a,d1					* New Line
-		moveq	#BD_PUTCHAR,d0
-		bgnd
-* ---------------------------------------------------------------------------
 		cmpi.b	#4,d1					*
 		beq.b	Flash_29C
+		clr.l	d7						* Clear d7 for correct error messages
 		bra.w	Programming_Error	
 *
 * ===========================================================================
@@ -101,8 +98,9 @@ Flash_Programming:
 * dummy 'placeholder' code for Atmel - always 'fails'
 *
 * ===========================================================================
-*
+
 Flash_29C:
+		clr.l	d7						* Clear d7 for correct error messages
 		bra.w	Programming_Error		* Branch to where Flash_Prog fails
 *
 * ===========================================================================
@@ -290,10 +288,11 @@ Flash_29F400_OK:
 * ===========================================================================
 *
 Programming_OK:
-		clr.w	d0
+		clr.l	d0
 		bra.b	Programming_Return
 * ---------------------------------------------------------------------------
 Programming_Error:
+		clr.l	d7						* Clear d7 for correct error messages
 		moveq	#1,d0
 Programming_Return:
 		rts

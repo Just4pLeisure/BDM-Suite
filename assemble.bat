@@ -1,7 +1,7 @@
 @ECHO OFF
 
 SET Outputs=release,listings
-SET Scripts=DUMPECU,FLASHECU
+SET Scripts=DUMPECU,FLASHECU,CHECKECU
 SET Cruft=SYM,S19
 SET Extras=messages,prepares
 
@@ -19,4 +19,4 @@ CD ..
 
 FOR %%f IN (%Extras%) DO COPY .\%%f\*.* .\release\*.*
 
-touch .\release\*.* 06-09-2012 01:00
+touch .\release\*.* 26-05-2013 01:01
