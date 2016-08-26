@@ -1,6 +1,6 @@
 * =============== B D 3 2 - C O M M A N D   F I L E =================== *
 * ===================================================================== *
-* =============== PREP ================================================ *
+* =============== DUMP ================================================ *
 * ===================================================================== *
 *
 * Prepare a Saab Trionic ECU to run a Target-Resident Command Driver
@@ -45,8 +45,8 @@
 * Version 1.2
 * 01-Dec-2013
 * 
-* Corrected a 'typo'
-* Usage: do prep
+* Customised version of 'prep' to run the 'dumpecu' script
+* Usage: do dump
 *
 * ===================================================================== *
 * Reset ECU
@@ -70,7 +70,7 @@ stop
 *
 mm 0xfff684+((*0xfffa00.w&0x80)*0x09)
 0x1000.
-* ===================================================================== *
+* =====wait================================================================ *
 * Disable watchdog and system protection
 *
 * Something in the T8 ECUs will reset the entire ECU if my program takes
@@ -110,3 +110,5 @@ cls
 * ===================================================================== *
 *
 * Your ECU is now prepared for DUMPing, FLASHing, ERASEing or CHECKing. *
+checkecu
+dumpecu

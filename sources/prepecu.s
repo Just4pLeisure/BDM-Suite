@@ -26,6 +26,12 @@
 * T8 part uses PLL lock status, both a better method than using a delay and
 * reduces code size.
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Add a delay to allow programming voltage to be ready which is needed by
+* 28Fxxx FLASH chips in T5.x ECUs
+* ===========================================================================
 *
 		EVEN
 *
@@ -78,7 +84,13 @@ Synthesiser_Lock_Flag:
 		move.w	d0,(a0)+				* PQS Data Register (PORTQS)
 *										* PQS Data Direction output (DDRQS)
 		move.w	d0,(a0)					* PQS Data Direction Register (DDRQS)
-* Do not need to wait for programming voltage to be ready becuase BD32 is slow
+* ---------------------------------------------------------------------------
+* Wait 10ms (plus margin) for programming voltage to be ready
+		move.w	#Count_10ms,d0
+Voltage_10ms_Delay:
+		nop
+		dbra	d0,Voltage_10ms_Delay
+* ---------------------------------------------------------------------------
 		bra.b	prep_return
 *
 prep_T8:

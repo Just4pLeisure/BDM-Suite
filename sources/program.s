@@ -29,7 +29,6 @@
 * @return		d0			SUCCESS / FAILURE
 * @return		d6			0x5555 Part of 29Fxxx unlock sequence
 * @return		d7			0xAAAA Part of 29Fxxx unlock sequence
-*							0x0 on FAILURE (for BD32 error return number)
 *
 * @param		a1			is the first FLASH address programmed
 * @return		a5			T5.x FLASH start address (always 0x000000)
@@ -48,6 +47,19 @@
 *
 * Removed a left over debug message
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Added support for Atmel 29Cxxx FLASH, Atmel chips no longer cause failure
+*
+* Simplified logic for selecting FLASH algorithm
+*
+* Use registers to store more things which in turn helps reduce code size by
+* avoiding repeated operations. This places a requirement that greater care
+* is needed to keep track of and preserve register contents.
+*
+* Other little tricks to reduce code size
+* ===========================================================================
 *
 		EVEN
 *
@@ -65,8 +77,7 @@ Flash_Programming:
 *
 		lea.l 	(BUFFER,pc),a3			* FLASH Write Buffer
 		move.l	a1,a4					* Where to start programming in FLASH
-		clr.l	d2
-		move.w	#BUFF_SIZE,d2			* Get number of bytes to program
+		move.l	#BUFF_SIZE,d2			* Get number of bytes to program
 *
 * ===========================================================================
 * =============== Work out which type of FLASH chips are fitted =============
@@ -78,34 +89,15 @@ Flash_Programming:
 * ===========================================================================
 *
 		move.b	(FLASH_Type,pc),d1
-		cmpi.b	#1,d1					* 28F512/010
+		subq.b	#1,d1					* 28F512/010
 		beq.b	Flash_28F
-		move.b	(FLASH_Type,pc),d1
-		cmpi.b	#2,d1					* AMD 29F010
-		beq.w	Flash_29F
-		move.b	(FLASH_Type,pc),d1
-		cmpi.b	#3,d1					* AMD 29F400T/BL802C 
+		subq.b	#1,d1					* AMD 29F010
+		beq.b	Flash_29F
+		subq.b	#1,d1					* AMD 29F400T/BL802C 
 		beq.w	Flash_29F400
-		cmpi.b	#4,d1					*
-		beq.b	Flash_29C
-		clr.l	d7						* Clear d7 for correct error messages
+		subq.b	#1,d1					* Atmel 29C512/010
+		beq.w	Flash_29C
 		bra.w	Programming_Error	
-*
-* ===========================================================================
-* =============== Program Atmel 29C010 FLASH chip types =====================
-* ===========================================================================
-*
-* dummy 'placeholder' code for Atmel - always 'fails'
-*
-* ===========================================================================
-
-Flash_29C:
-		clr.l	d7						* Clear d7 for correct error messages
-		bra.w	Programming_Error		* Branch to where Flash_Prog fails
-*
-* ===========================================================================
-* =============== End of Program Atmel 29C010 FLASH chip types ==============
-* ===========================================================================
 *
 * ===========================================================================
 * =============== Program 28F512/010 FLASH chip types =======================
@@ -217,12 +209,12 @@ Flash_29F_Verify:
 		move.b	d7,(a6,d0.l)			* Programming timed out if here
 		move.b	d6,(a5,d0.l)			* Have to reset FLASH chip when...
 		move.b	#F29_Reset_Cmd,(a6,d0.l)		* ...programming fails
-		bra.b	Programming_Error		* Go back to where Flash_Prog fails
+		bra.w	Programming_Error		* Go back to where Flash_Prog fails
 * ---------------------------------------------------------------------------
 Flash_29F_OK:
 		subq.l	#1,d2
 		bne.b	Flash_29F_Another		* OK so program another one
-		bra.w	Programming_OK
+		bra.b	Programming_OK
 *
 * ===========================================================================
 * =============== End of Program AMD 29F010 FLASH chip types ================
@@ -277,10 +269,58 @@ Flash_29F400_Verify:
 Flash_29F400_OK:
 		subq.l	#2,d2
 		bne.b	Flash_29F400_Another	* OK so program another one
-*		bra.b	Programming_OK
+		bra.b	Programming_OK
 *
 * ===========================================================================
 * =============== End of Program AMD 29F400 FLASH chip types ================
+* ===========================================================================
+*
+* ===========================================================================
+* =============== Program Atmel 29C010 FLASH chip types =====================
+* ===========================================================================
+*
+*	d1 - used for delay loop counters
+*	d2 - count of number of bytes - add to -2(a4) to get address to program
+*	d3 - used for checking that FLASH is programmed
+*	d6 - 0x5555 Part of 29Fxxx unlock sequence
+*	d7 - 0xAAAA Part of 29Fxxx unlock sequence
+*
+*	a3 - is the address of the FLASH_Write_Buffer
+*	a4 - is the first FLASH address to program (add to d2)
+*	a5 - 0x5554 (0x2AAA*2) 29Fxxx unlock address
+*	a6 - 0xAAAA (0x5555*2) 29Fxxx unlock address
+*
+* ===========================================================================
+*
+Flash_29C:
+Flash_29C_Sector:
+		move.w	d7,(a6)			*
+		move.w	d6,(a5)			*
+		move.w	#$A0A0,(a6)		* Program FLASH sequence
+Flash_29C_Another:
+		move.w	-2(a3,d2.l),-2(a4,d2.l)	* get a word to program
+		subq.l	#2,d2
+		bne.b	Flash_29C_Another	* OK so program another one
+* ---------------------------------------------------------------------------
+* Wait 10ms (plus margin) for ATMEL programming algorithm to complete
+		move.w	#Count_10ms,d1
+Program_10ms_Delay:
+		nop
+		dbra	d1,Program_10ms_Delay
+* ---------------------------------------------------------------------------
+* Verify the sector just programmed
+		move.w	#BUFF_SIZE,d2		* Get number of bytes to compare
+Verify_29C_Sector:
+Verify_29C_Another:
+		move.w	-2(a3,d2.l),d3		* get a word to verify
+		cmp.w	-2(a4,d2.l),d3		* Compare FLASH with Buffer
+		bne.b	Programming_Error	* Branch to where Flash_Prog fails
+		subq.l	#2,d2
+		bne.b	Verify_29C_Another	* OK so check another one
+*		bra.b	Programming_OK		* All Checked and OK
+*
+* ===========================================================================
+* =============== End of Program Atmel 29C010 FLASH chip types ==============
 * ===========================================================================
 *
 * ===========================================================================
@@ -292,7 +332,6 @@ Programming_OK:
 		bra.b	Programming_Return
 * ---------------------------------------------------------------------------
 Programming_Error:
-		clr.l	d7						* Clear d7 for correct error messages
 		moveq	#1,d0
 Programming_Return:
 		rts

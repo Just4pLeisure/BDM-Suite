@@ -1,4 +1,4 @@
-FLASHECU Programs a BIN file into the FLASH memory of a SAAB Trionic5/7/8 ECU
+ERASEECU Wipes the FLASH memory of a SAAB Trionic5/7/8 ECU
 1: ERROR: Unrecognised ECU or FLASH chips!
 2: ERROR: Could not open BIN file!
 3: ERROR: Could not read from BIN file!

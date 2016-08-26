@@ -1,4 +1,9 @@
-DUMPECU	for reading the FLASH memory of a SAAB Trionic ECU
-1: Error: Could not write to BIN file
-2: Error: Could not open BIN file
-3: Error: Unrecognised ECU or FLASH chips
+DUMPECU  Saves the FLASH memory of a SAAB Trionic5/7/8 ECU to a BIN file.
+1: ERROR: Unrecognised ECU or FLASH chips!
+2: ERROR: Could not open BIN file!
+3: ERROR: Could not read from BIN file!
+4: ERROR: Could not write to BIN file!
+5: ERROR: Unable to erase FLASH chips!
+6: ERROR: Unable to program FLASH chips!
+7: ERROR: Could not read HEADER information! Update ECU with FLASHECU 
+8: ERROR: Checksum is incorrect! Update ECU with FLASHECU

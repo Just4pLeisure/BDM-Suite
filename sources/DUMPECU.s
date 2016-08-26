@@ -45,6 +45,20 @@
 * Enable backspace to allow editing/correction of BIN file's filename
 * Turn off FLASH programming voltage when not needed
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Bugfixes:
+* FIXED a serious bug for T5.2/5 ECUS. which prevented the scripts working
+* and displayed the '3: Error: Unrecognised ECU or FLASH chips' message
+* This was due to a timing issue with the FLASH programming voltage and meant
+* that I couldn't reliably detect 28F010 or 28F512 FLASH chips!
+*
+* Improvements:
+* Better reporting of errors if they occur
+* Improved control of FLASH programming voltage
+* Improved editing of BIN file's filename
+* ===========================================================================
 * ===========================================================================
 *
 * WARNING: Use at your own risk, sadly this software comes with no guarantees
@@ -57,13 +71,15 @@
 		EVEN
 *
 START			dc.l	PROG_START	
-*
+* ---------------------------------------------------------------------------
+STACK			dc.b	'STACK_IT'		* Reserve 4 Words for the Stack
+* ---------------------------------------------------------------------------
 Start_Msg		dc.b	'Trionic ECU DUMP script',$0D,$0A,$0
 Dump_Msg 		dc.b	'DUMPing FLASH chip addresses:',$0D,$0A,$0
 End_Msg   		dc.b	'Trionic ECU DUMPed to: ',$0
 *
 FLASH_Size_Msg	dc.b	'FLASH size: 0x'
-Bytes_Msg		dc.b	'0Cafe0 Bytes'
+Bytes_Msg		dc.b	'0Fade0 Bytes'
 CR_LF			dc.b	$0D,$0A,$0
 *
 Progress_Msg	dc.b	'0x'
@@ -78,6 +94,7 @@ FMODE			dc.b	'wb',0			* Write privileges for file
 		EVEN
 *
 		include ipd.inc					* BD32 function call constants
+		include errors.inc				* Program Error Code constants
 		include buffers.inc				* Storage buffer constants
 		include timers.inc				* Delay loop constants
 		include flash.inc				* FLASH chip constants
@@ -97,9 +114,7 @@ FMODE			dc.b	'wb',0			* Write privileges for file
 		EVEN
 *
 PROG_START:
-		lea.l	(STACK,pc),a7			* Stack pointer definition
-		clr.l	(FILE,a5)				* File pointer 
-		clr.l	d7						* No errors
+		lea.l	(STACK+8,pc),a7			* Stack pointer definition
 *
 * Display start message
 *
@@ -125,7 +140,9 @@ PROG_START:
 * Check that FLASH is recognised
 Check_FLASH_OK:
 		tst.w	d2						* d2 has FLASH_type, 0 means unknown
-		beq.w	Unknown_FLASH
+		bne.b	Identified_FLASH
+		moveq	#ERROR_Unknown,d2		* Error 1! Unknown FLASH chips
+		bra.w	End_Program
 * ---------------------------------------------------------------------------
 Identified_FLASH:
 *
@@ -146,14 +163,16 @@ Identified_FLASH:
 *
 		jsr		(Get_filename,pc).w
 		tst.w	d0
-		beq		File_Open_Error			* Error: file could not be opened
-
+		bne.b	File_Open_OK
+		moveq	#ERROR_FOpen,d2			* Error 2! Could not open file
+		bra.b	End_Program
+* ---------------------------------------------------------------------------
+File_Open_OK:
 * Dump flash to file
 		lea.l	(Dump_Msg,pc),a0		* Show DUMPing FLASH chips message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
-		move.l	d7,a1					* Start address to read from
-*		lea.l	0,a1
+		lea.l	$0,a1					* Base address of FLASH
 READ_WRITE:
 		lea.l	(Progress_Msg1,pc),a0
 		move.l	a1,d2					* start address of FLASH 'chunk'
@@ -166,12 +185,16 @@ READ_WRITE:
 		bgnd
 
 		move.l	a1,a0
-		move.l	(FILE,a5),d1			* File handle
+		move.l	(FILE,pc),d1			* File handle
 		move.l	#BUFF_SIZE,d2			* Number of bytes to copy
 		moveq	#BD_FWRITE,d0			* BD32 write to file function call
 		bgnd
 		cmpi.w	#BUFF_SIZE,d0			* Check the 'chunk' was written OK
-		bne.b	File_Write_Error
+		beq.b	File_Write_OK
+		moveq	#ERROR_FWrite,d2		* Error 4! Could not write to file
+		bra.b	End_Program
+* ---------------------------------------------------------------------------
+File_Write_OK:
 		add.w	#BUFF_SIZE,a1			* Prepare to transfer another 'chunk'
 		cmp.l	(FLASH_Size,pc),a1		* Check if all done
 		bne.b	READ_WRITE
@@ -180,31 +203,22 @@ READ_WRITE:
 		lea.l	(End_Msg,pc),a0			* Show successful DUMP message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
-		lea.l 	(FILE_NAME,a5),a0		* Get BIN file's filename
+		lea.l 	(FILE_NAME,pc),a0		* Get BIN file's filename
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
 		lea.l	(CR_LF,pc),a0
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
-		bra.b	Close_File
-*
-Unknown_FLASH:
-		addq	#1,d7					* Error 3! Unknown FLASH chips 
-File_Open_Error:
-		addq	#1,d7					* Error 2! Could not open file
-File_Write_Error:
-		addq	#1,d7					* Error 1! Could not write to file
+		clr.l	d2						* No errors
+End_Program:
 Close_File:
-		move.l	(FILE,a5),d1			* File handle
+		move.l	(FILE,pc),d1			* File handle
 		beq.b	Leave_Resident_Driver	* Check if file is open
 		moveq	#BD_FCLOSE,d0			* Close file
 		bgnd
 Leave_Resident_Driver:
-		move.l	d7,d1					* Exit code, !=0 is an error
+		move.l	d2,d1					* Exit code, !=0 is an error
 		moveq	#BD_QUIT,d0				* Finished
 		bgnd
-*
-				dc.b	'STACK_STACK_STACK_STACK_STACK_'
-STACK			ds.w	1				* Reserve 16 Words for the Stack
 *
 	END

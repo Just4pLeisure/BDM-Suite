@@ -31,6 +31,11 @@
 *
 * Added the ability to edit the filename as it is typed 
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Improved filename editing
+* ===========================================================================
 *
 		EVEN
 *
@@ -50,7 +55,7 @@ Get_filename:
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
 		lea.l 	(FILE_NAME,pc),a0		* Get ready to store a filename
-		moveq	#7,d4
+		moveq	#8,d4
 Filename_loop:
 		moveq	#BD_GETCHAR,d0			* BD32 get character function call
 		bgnd							* Get one character at a time
@@ -58,13 +63,19 @@ Filename_loop:
 		beq.b	Got_Filename
 		cmpi.b	#'.',d0					* test for '.'
 		beq.b	Got_Filename
-		move.b	d0,(a0)+				* store the character
 		cmpi.b	#$8,d0					* test for backspace
-		bne.b	Display_Character
-		subq	#2,a0					* move back 1 character in
+		bne.b	Store_Character
+		cmp.b	d0,d4					* backspace is also max file length
+		beq.b	Filename_loop
+		subq	#1,a0					* move back 1 character in
 *										* FILE_NAME string
-		addq	#1,d4					* increase by 2 for deleted char and
+		addq	#2,d4					* increase by 2 for deleted char and
 *										* backspace
+		bra.b	Display_Character
+Store_Character:
+		tst.b	d4						* Is this be the last character
+		beq.b	Got_Filename
+		move.b	d0,(a0)+				* store the character
 Display_Character:
 		move.b	d0,d1
 		moveq	#BD_PUTCHAR,d0			* BD32 display character function call
@@ -87,7 +98,8 @@ Got_Filename:
 		lea.l	(FMODE,pc),a1			* Open the file using correct mode
 		moveq	#BD_FOPEN,d0			* BD32 File open function call
 		bgnd
-		move.l	d0,(FILE,a5)			* Store the FILE handle
+		lea.l	(FILE,pc),a0
+		move.l	d0,(a0)					* Store the FILE handle
 		rts
 *
 * ===========================================================================

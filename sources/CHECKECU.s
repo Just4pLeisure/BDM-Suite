@@ -50,6 +50,19 @@
 *
 * A new addition to the 'Universal BDM scripts for Trionic'
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Bugfixes:
+* FIXED a serious bug for T5.2/5 ECUS. which prevented the scripts working
+* and displayed the '3: Error: Unrecognised ECU or FLASH chips' message
+* This was due to a timing issue with the FLASH programming voltage and meant
+* that I couldn't reliably detect 28F010 or 28F512 FLASH chips!
+*
+* Improvements:
+* Better reporting of errors if they occur
+* Improved control of FLASH programming voltage
+* ===========================================================================
 * ===========================================================================
 *
 * WARNING: Use at your own risk, sadly this software comes with no guarantees
@@ -62,12 +75,14 @@
 		EVEN
 *
 START			dc.l	PROG_START	
-*
+* ---------------------------------------------------------------------------
+STACK			dc.b	'STACK_IT'		* Reserve 4 Words for the Stack
+* ---------------------------------------------------------------------------
 Start_Msg		dc.b	'Trionic ECU Checksum Script'
 CR_LF			dc.b	$0D,$0A,$0
 *
 FLASH_Size_Msg	dc.b	'FLASH size: 0x'
-Bytes_Msg		dc.b	'0Feed0 Bytes',$0D,$0A,$0
+Bytes_Msg		dc.b	'0Fade0 Bytes',$0D,$0A,$0
 *
 Stored_Msg_Pt1	dc.b	'The checksum stored in FLASH is: 0x'
 Stored_Msg_Pt2	dc.b	'CafeBabe',$0D,$0A,$0
@@ -76,7 +91,7 @@ Range_Msg_Pt1	dc.b	'Calculating ECU checksum for addresses: 0x'
 Range_Msg_Pt2	dc.b	'0Deaf0-0Beef0',$0D,$0A,$0
 *
 Calcd_Msg_Pt1	dc.b	'The calculated checksum is: 0x'
-Calcd_Msg_Pt2	dc.b	'BabeCafe',$0D,$0A,$0
+Calcd_Msg_Pt2	dc.b	'FeedF00d',$0D,$0A,$0
 *
 End_Msg   	dc.b	'Stored and calculated checksum match :-)',$0D,$0A,$0
 *
@@ -87,6 +102,7 @@ End_Msg   	dc.b	'Stored and calculated checksum match :-)',$0D,$0A,$0
 		EVEN
 *
 		include ipd.inc					* BD32 function call constants
+		include errors.inc				* Program Error Code constants
 		include timers.inc				* Delay loop constants
 		include flash.inc				* FLASH chip constants
 		include checksum.inc			* Checksum calculation constants
@@ -107,8 +123,7 @@ End_Msg   	dc.b	'Stored and calculated checksum match :-)',$0D,$0A,$0
 		EVEN
 *
 PROG_START:
-		lea.l	(STACK,pc),a7			* Stack pointer definition
-		clr.l	d7						* No errors
+		lea.l	(STACK+8,pc),a7			* Stack pointer definition
 *
 * Display start message
 *
@@ -134,7 +149,9 @@ PROG_START:
 * Check that FLASH is recognised
 Check_FLASH_OK:
 		tst.w	d2						* d2 has FLASH_type, 0 means unknown
-		beq.w	Unknown_FLASH
+		bne.b	Identified_FLASH
+		moveq	#ERROR_Unknown,d2		* Error 1! Unknown FLASH chips
+		bra.w	End_Program
 * ---------------------------------------------------------------------------
 Identified_FLASH:
 *
@@ -278,10 +295,14 @@ Get_T8_Identifiers:
 *										* ROM_Offset !!!
 		bls.b	Identifier_Error
 * ---------------------------------------------------------------------------
+* Some T8 ECUs store a BYTE checksum, others use LONG.
+*
+* Try both methods, BYTE first:
 		jsr 	(Calculate_BYTE_Checksum,pc).w
 		cmp.l	d0,d7
 		beq.b	Show_Checksum
 		and.l	#$FFFFFFFC,d3			* Make sure d3 is aligned to a LONG
+* Try LONG if BYTE checksum fails
 		jsr 	(Calculate_LONG_Checksum,pc).w
 		bra		Show_Checksum
 * ===========================================================================
@@ -289,24 +310,22 @@ Show_Checksum:
 		jsr 	(Show_Calc_Checksum,pc).w
 		cmp.l	d2,d7
 		beq.b	Checksums_Match
-		clr.l	d7
-		bra.b	Checksum_Mismatch
+		moveq	#ERROR_Checksum,d2		* Error 8! Checksum does not match
+		bra.b	End_Program
 * ---------------------------------------------------------------------------
 * Display end message
 Checksums_Match:
 		lea.l	(End_Msg,pc),a0			* Show Checksums match message
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
+		clr.l	d2						* No errors
 		bra.b	Leave_Resident_Driver	* Check if file is open
 * ---------------------------------------------------------------------------
-Unknown_FLASH:
-		addq	#1,d7					* Error 3! Unknown FLASH chips 
 Identifier_Error:
-		addq	#1,d7					* Error 2! Could not find BIN Header
-Checksum_Mismatch:
-		addq	#1,d7					* Error 1! Bad Checksum calculation
+		moveq	#ERROR_Header,d2		* Error 7! Could not find BIN Header
+End_Program:
 Leave_Resident_Driver:
-		move.l	d7,d1					* Exit code, !=0 is an error
+		move.l	d2,d1					* Exit code, !=0 is an error
 		moveq	#BD_QUIT,d0				* Finished
 		bgnd
 * ===========================================================================
@@ -344,8 +363,4 @@ Show_Calc_Checksum:
 		moveq	#BD_PUTS,d0				* BD32 display string function call
 		bgnd
 		rts
-*
-* Reserve 10 Words for the Stack
-				dc.b	'STACK_STACK_STACK_STACK_STACK_'
-STACK			ds.w	1
 *	END

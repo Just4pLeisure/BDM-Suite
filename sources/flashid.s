@@ -33,6 +33,11 @@
 *				d1			FLASH_Size
 * @return		FLASH_Type	0=?, 1=28F, 2=29F 8bit, 3=29F 16bit, 4=29C
 *				d2			FLASH_Type
+* @return		d6			0x5555 1st part of FLASH chip unlock sequence
+* @return		d7			0xAAAA 2nd part of FLASH chip unlock sequence
+*
+* @return		a5			0x5554 (0x2AAA*2) 1st FLASH chip unlock address
+* @return		a6			0xAAAA (0x5555*2) 2nd FLASH chip unlock address
 *
 * ===========================================================================
 * Created by Sophie Dexter
@@ -50,6 +55,14 @@
 *
 * lea.l	$0,a2 uses less bytes than movea.l	#0,a2 to set a2 to 0x0000
 * ===========================================================================
+* Version 1.2
+* 28-Nov-2013
+*
+* Put 0x5555 and 0xAAAA 29Fxxx unlock sequence codes in d6 and d7
+* Put 0x2AAA*2 and 0x5555*2 29Fxxx unlock addresses in a5 and a6
+* This reduces code size and makes these values available for other
+* subroutines to use without having to fetch them again
+* ===========================================================================
 *
 		EVEN
 *
@@ -62,17 +75,24 @@ FLASH_Type:	dc.b	0	* 0=?, 1=28F, 2=29F 8bit, 3=29F 16bit, 4=29C
 		EVEN
 *
 Get_FLASH_Id:
+* Load registers with values used for device Id sequence
+* (also used for 29Cxxx/29Fxxx and 39Fxxx erase and programming sequences)
+		move.l	#$5555,d6
+		move.l	#$AAAA,d7
+		movea.l	d6,a5			* $2AAA*2 == $5554
+		subq.l	#1,a5			* now  a5 == $5554
+		movea.l	d7,a6			* $5555*2 == $AAAA
 * Read FLASH chip manufacturer and device Ids
-		lea.l	$0,a2					* Base address of FLASH
-		move.w	#$AAAA,$5555*2			*
-		move.w	#$5555,$2AAA*2			*
-		move.w	#$9090,$5555*2			*
+		lea.l	$0,a2			* Base address of FLASH
 		lea.l	(FLASH_Id,pc),a3
-		move.w	(a2)+,(a3)+
-		move.w	(a2),(a3)
-		move.w	#$AAAA,$5555*2			* d7 = 0xAA
-		move.w	#$5555,$2AAA*2			* d6 = 0x55
-		move.w	#$F0F0,$5555*2			* Reset 29F/Cxxx FLASH chip
+		move.w	d7,(a6)			* Special mode access sequence
+		move.w	d6,(a5)			* " " "
+		move.w	#$9090,(a6)		* Command to read Device IDs
+		move.w	(a2)+,(a3)+		* Store Manufacturer Id.
+		move.w	(a2),(a3)		* Store Device Id.
+		move.w	d7,(a6)			* Special mode access sequence
+		move.w	d6,(a5)			* " " "
+		move.w	#$F0F0,(a6)		* Command to reset FLASH chip(s)
 * Prepare to work out size of FLASH chip(s)
 		move.l	(FLASH_Id,pc),d0
 * Check for FLASH chips that might be in a T5.2 ECU

@@ -1,6 +1,6 @@
 * =============== B D 3 2 - C O M M A N D   F I L E =================== *
 * ===================================================================== *
-* =============== PREP ================================================ *
+* =============== ERASE =============================================== *
 * ===================================================================== *
 *
 * Prepare a Saab Trionic ECU to run a Target-Resident Command Driver
@@ -45,8 +45,8 @@
 * Version 1.2
 * 01-Dec-2013
 * 
-* Corrected a 'typo'
-* Usage: do prep
+* Customised version of 'prep' to interoperate with bdmsuite.bat
+* Usage: do erasew
 *
 * ===================================================================== *
 * Reset ECU
@@ -110,3 +110,6 @@ cls
 * ===================================================================== *
 *
 * Your ECU is now prepared for DUMPing, FLASHing, ERASEing or CHECKing. *
+eraseecu
+wait
+exit

@@ -1,0 +1,38 @@
+Change log
+==========
+
+Version 1.0 - 06-Sep-2012
+-------------------------
+First release, only included DUMP and FLASH scripts
+
+Version 1.1 - 26-May-2013
+-------------------------
+Added a new CHECKECU script to calculate the 'FB' checksum. This is a much
+faster way of checking that FLASHing was succesful than the alternative of
+DUMPing after FLASHing and then comparing files using dos 'fc'.
+
+Allowed editing the filename in case of making mistakes when typing it.
+
+Corrected a problem preventing the scripts working with T8 ECUs. Version 1.0
+did not work for T8 ECUs because of a memory problem. To be quite honest I am
+still confused, but the MC68377 reference manual is ambiguous when describing
+its SRAM Module configuration.
+
+Several small bug fixes and improvements for reporting errors.
+
+Version 1.2 - 01-Dec-2013
+-------------------------
+Added a new ERASEECU script which erases the FLASH chips. Separately erasing
+is not usually necessary, but this script also uses my 'brute force' algorithm
+which may help to revive 'bad' 28F010 FLASH chips.
+
+Added Support for ATMEL 29C010 FLASH chips (finally!)
+
+FIXED a serious bug for T5.2/5 ECUS. which prevented the scripts working
+and displayed the '3: Error: Unrecognised ECU or FLASH chips' message.
+This was due to a timing issue with the FLASH programming voltage and meant
+that I couldn't reliably detect 28F010 or 28F512 FLASH chips!
+
+More improvements for reporting errors.
+Improved control of FLASH programming voltage.
+Imroved fileneme editing in FLASHECU and DUMPECU scripts

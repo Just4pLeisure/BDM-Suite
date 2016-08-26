@@ -1,9 +1,9 @@
 @ECHO OFF
 
 SET Outputs=release,listings
-SET Scripts=DUMPECU,FLASHECU,CHECKECU
+SET Scripts=DUMPECU,FLASHECU,CHECKECU,ERASEECU,WAIT
 SET Cruft=SYM,S19
-SET Extras=messages,prepares
+SET Extras=messages,prepares,notes,batches
 
 FOR %%d IN (%Outputs%) DO IF NOT EXIST .\%%d\NUL MKDIR .\%%d
 FOR %%d IN (%Outputs%) DO FOR %%f IN (.\%%d\*.*) DO DEL %%f
@@ -19,4 +19,4 @@ CD ..
 
 FOR %%f IN (%Extras%) DO COPY .\%%f\*.* .\release\*.*
 
-touch .\release\*.* 26-05-2013 01:01
+touch .\release\*.* 01-12-2013 01:02
